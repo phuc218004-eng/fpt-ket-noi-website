@@ -56,47 +56,74 @@ document.querySelectorAll(".choose-package").forEach(link => {
   });
 });
 
-document.getElementById("leadForm").addEventListener("submit", async event => {
-  event.preventDefault();
-  const name = document.getElementById("name").value.trim();
-  const phone = document.getElementById("phone").value.trim();
-  const area = document.getElementById("area").value.trim();
-  const need = document.getElementById("need").value;
-  const note = document.getElementById("note").value.trim();
 
-  if (!/^[0-9+ .()-]{9,16}$/.test(phone)) {
-    document.getElementById("phone").focus();
+document.getElementById("leadForm").addEventListener("submit", async (event) => {
+  event.preventDefault();
+
+  const form = event.currentTarget;
+  const button = form.querySelector('button[type="submit"]');
+  const hint = document.getElementById("formHint");
+
+  const data = {
+    name: document.getElementById("name").value.trim(),
+    phone: document.getElementById("phone").value.trim(),
+    address: document.getElementById("area").value.trim(),
+    plan: document.getElementById("need").value,
+    note: document.getElementById("note").value.trim()
+  };
+
+  if (!data.name || !data.phone || !data.address) {
+    alert("Vui lòng điền đầy đủ thông tin.");
+    return;
+  }
+
+  if (!/^[0-9+ .()-]{9,16}$/.test(data.phone)) {
     alert("Vui lòng kiểm tra lại số điện thoại.");
     return;
   }
 
-  const message = [
-    "Xin chào Phúc, tôi muốn được tư vấn lắp đặt Internet FPT.",
-    `Họ và tên: ${name}`,
-    `Số điện thoại: ${phone}`,
-    `Khu vực lắp đặt: ${area}`,
-    `Gói quan tâm: ${need}`,
-    `Ghi chú: ${note || "Không có"}`
-  ].join("\n");
-
-  const hint = document.getElementById("formHint");
-  let copied = false;
-  try {
-    await navigator.clipboard.writeText(message);
-    copied = true;
-  } catch (_) {
-    const helper = document.createElement("textarea");
-    helper.value = message;
-    helper.style.position = "fixed";
-    helper.style.opacity = "0";
-    document.body.appendChild(helper);
-    helper.select();
-    try { copied = document.execCommand("copy"); } catch (_) {}
-    helper.remove();
+  if (button) {
+    button.disabled = true;
+    button.textContent = "Đang gửi yêu cầu...";
   }
 
-  hint.textContent = copied
-    ? "Đã sao chép nội dung yêu cầu. Zalo đang được mở — bạn dán tin nhắn và nhấn Gửi cho Phúc nhé."
-    : "Zalo đang được mở. Nếu nội dung chưa được sao chép, vui lòng sao chép thông tin từ biểu mẫu và gửi cho Phúc.";
-  window.open("https://zalo.me/0372191218", "_blank", "noopener");
+  if (hint) hint.textContent = "Đang gửi thông tin...";
+
+  try {
+    const response = await fetch("/api/lead", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(data)
+    });
+
+    const result = await response.json();
+
+    if (!response.ok || !result.success) {
+      throw new Error(result.message || "Gửi thất bại");
+    }
+
+    if (hint) {
+      hint.textContent =
+        "Đăng ký thành công! Phúc FPT sẽ sớm liên hệ bạn.";
+    } else {
+      alert("Đăng ký thành công! Phúc FPT sẽ sớm liên hệ bạn.");
+    }
+
+    form.reset();
+
+  } catch (error) {
+    if (hint) {
+      hint.textContent = "Gửi chưa thành công. Vui lòng thử lại.";
+    } else {
+      alert("Gửi chưa thành công. Vui lòng thử lại.");
+    }
+
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = "Gửi yêu cầu qua Zalo";
+    }
+  }
 });
