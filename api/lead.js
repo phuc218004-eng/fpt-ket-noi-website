@@ -1,7 +1,10 @@
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
-    return res.status(405).json({ success: false });
+    return res.status(405).json({
+      success: false,
+      message: "Method not allowed"
+    });
   }
 
   try {
@@ -10,17 +13,24 @@ export default async function handler(req, res) {
     if (!name || !phone || !address) {
       return res.status(400).json({
         success: false,
-        message: "Thiếu thông tin bắt buộc"
+        message: "Vui lòng nhập đầy đủ thông tin"
       });
     }
 
-    const response = await fetch(process.env.APPS_SCRIPT_URL, {
+    const scriptUrl = process.env.APPS_SCRIPT_URL;
+    const secret = process.env.LEAD_SECRET;
+
+    if (!scriptUrl || !secret) {
+      throw new Error("Thiếu cấu hình môi trường Vercel");
+    }
+
+    const response = await fetch(scriptUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        token: process.env.LEAD_SECRET,
+        token: secret,
         name,
         phone,
         address,
@@ -32,16 +42,23 @@ export default async function handler(req, res) {
     const result = await response.json();
 
     if (!response.ok || !result.success) {
-      throw new Error("Không thể lưu thông tin khách hàng");
+      console.error("Apps Script error:", result);
+      throw new Error(
+        result.error || result.message || "Google Sheets không nhận được dữ liệu"
+      );
     }
 
-    return res.status(200).json({ success: true });
+    return res.status(200).json({
+      success: true,
+      message: "Đã lưu thông tin khách hàng"
+    });
 
   } catch (error) {
-    console.error(error);
+    console.error("Lead API error:", error);
+
     return res.status(500).json({
       success: false,
-      message: "Gửi yêu cầu thất bại"
+      message: error.message || "Gửi yêu cầu thất bại"
     });
   }
 }
